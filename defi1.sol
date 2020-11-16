@@ -185,7 +185,7 @@ contract Voting is Ownable {
             "This function can only be called if vote is tallied"
         );
         require(
-            proposals.length > 0,
+            proposals.length > 1,
             "There were no proposal during this vote"
         );
         return proposals[winningProposalId].description;
