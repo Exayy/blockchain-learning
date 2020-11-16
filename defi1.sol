@@ -38,9 +38,9 @@ contract Voting is Ownable {
         WorkflowStatus newStatus
     );
 
-    uint256 public winningProposalId = 0; // Issue : proposal[0] is by default the winner
+    uint256 public winningProposalId; // Issue : proposal[0] is by default the winner
     Proposal[] public proposals;
-    uint256 votersCount = 0;
+    uint256 votersCount;
     mapping(address => Voter) public voters;
     WorkflowStatus public workflowStatus = WorkflowStatus.RegisteringVoters;
 
@@ -52,30 +52,35 @@ contract Voting is Ownable {
         _;
     }
 
+    constructor() public {
+        proposals.push(
+            Proposal("No winning proposal, please wait for tally", 0)
+        );
+    }
+
     function changeWorkflowStatus(WorkflowStatus newStatus) internal {
         emit WorkflowStatusChange(workflowStatus, newStatus);
         workflowStatus = newStatus;
     }
 
-    // Voter registration [admin only]
-    function addVoter(address _voterAddress) external onlyOwner {
+    function addVoter(address voterAddress) external onlyOwner {
         require(
             workflowStatus == WorkflowStatus.RegisteringVoters,
             "This function can't be called because voters registering is closed"
         );
         require(
-            voters[_voterAddress].isRegistered == false,
+            voters[voterAddress].isRegistered == false,
             "This voter has already been registered"
         );
-        voters[_voterAddress] = Voter(true, false, 0);
+        voters[voterAddress] = Voter(true, false, 0);
         votersCount++;
-        emit VoterRegistered(_voterAddress);
+        emit VoterRegistered(voterAddress);
     }
 
     function startProposalsRegistration() external onlyOwner {
         require(
             workflowStatus == WorkflowStatus.RegisteringVoters,
-            "This function can only be called when voters registering is still opened"
+            "This function can only be called when voters registering is opened"
         );
         changeWorkflowStatus(WorkflowStatus.ProposalsRegistrationStarted);
         emit ProposalsRegistrationStarted();
@@ -102,7 +107,7 @@ contract Voting is Ownable {
     function endVotingSession() external onlyOwner {
         require(
             workflowStatus == WorkflowStatus.VotingSessionStarted,
-            "This function can only be called if proposals registration is opened"
+            "This function can only be called if voting session is opened"
         );
         changeWorkflowStatus(WorkflowStatus.VotingSessionEnded);
         emit VotingSessionEnded();
@@ -124,45 +129,50 @@ contract Voting is Ownable {
         emit VotesTallied();
     }
 
-    function addProposal(string memory _description) external onlyVoter {
+    function addProposal(string memory description) external onlyVoter {
         bool proposalExist = false;
         for (uint256 i = 0; i < proposals.length; i++) {
             if (
                 keccak256(abi.encode(proposals[i].description)) ==
-                keccak256(abi.encode(_description))
+                keccak256(abi.encode(description))
             ) {
                 proposalExist = true;
                 break;
             }
         }
+        require(proposalExist == false, "This proposal already exist");
         require(
-            bytes(_description).length > 0,
+            bytes(description).length > 0,
             "Proposal must have a description"
         );
-        require(proposalExist == false, "This proposal already exist");
+
         require(
             workflowStatus == WorkflowStatus.ProposalsRegistrationStarted,
             "This function can only be called if proposals registration is opened"
         );
-        proposals.push(Proposal(_description, 0));
-        emit ProposalsRegistrationEnded();
+        proposals.push(Proposal(description, 0));
+        emit ProposalRegistered(proposals.length - 1);
     }
 
-    function vote(uint256 _proposalId) external onlyVoter {
+    function vote(uint256 proposalId) external onlyVoter {
         require(
             workflowStatus == WorkflowStatus.VotingSessionStarted,
             "This function can only be called if voting session is opened"
         );
 
         require(voters[msg.sender].hasVoted == false, "You can only vote once");
-        require(_proposalId < proposals.length, "This proposal doesn't exist");
-        proposals[_proposalId].voteCount++;
+        require(
+            proposalId != 0 && proposalId < proposals.length,
+            "This proposal doesn't exist"
+        );
+        proposals[proposalId].voteCount++;
         voters[msg.sender].hasVoted = true;
-        emit Voted(msg.sender, _proposalId);
+        voters[msg.sender].votedProposalId = proposalId;
+        emit Voted(msg.sender, proposalId);
     }
 
     function getProposalCount() external view returns (uint256) {
-        return proposals.length;
+        return proposals.length - 1;
     }
 
     function getVoterCount() external view returns (uint256) {
