@@ -38,7 +38,7 @@ contract Voting is Ownable {
         WorkflowStatus newStatus
     );
 
-    uint256 public winningProposalId; // Issue : proposal[0] is by default the winner
+    uint256 public winningProposalId;
     Proposal[] public proposals;
     uint256 votersCount;
     mapping(address => Voter) public voters;
